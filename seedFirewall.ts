@@ -8,7 +8,7 @@ dotenv.config();
 // Initialize Free Google Gemini Embeddings Engine
 const embeddings = new GoogleGenerativeAIEmbeddings({
   apiKey: process.env.GEMINI_API_KEY,
-  modelName: "embedding-001",
+  modelName: "gemini-embedding-001",
 });
 
 // Synthetic PHI profiles representing highly sensitive vectors to catch
