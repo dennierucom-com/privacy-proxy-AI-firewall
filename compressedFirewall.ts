@@ -15,7 +15,7 @@ const embeddings = new GoogleGenerativeAIEmbeddings({
 
 const model = new ChatGoogleGenerativeAI({
   apiKey: process.env.GEMINI_API_KEY,
-  model: "gemini-1.5-flash",
+  model: "gemini-3.5-flash",
   temperature: 0.1,
 });
 
@@ -57,39 +57,36 @@ async function initializeCompressedFirewall() {
         }
       }
     },
-    {
-      // Hybrid Evaluation Layer
-      evaluation: async (state: any) => {
-        let finalRiskScore = 0;
-        const promptToAnalyze = state.originalPrompt;
+    async (state: any) => {
+      let finalRiskScore = 0;
+      const promptToAnalyze = state.originalPrompt;
 
-        // 1. Run quick deterministic parsing
-        const regexSignals = runLocalRegexScan(promptToAnalyze);
-        regexSignals.forEach(s => finalRiskScore += s.weight);
+      // 1. Run quick deterministic parsing
+      const regexSignals = runLocalRegexScan(promptToAnalyze);
+      regexSignals.forEach(s => finalRiskScore += s.weight);
 
-        // 2. Evaluate compressed content against Vector Database
-        if (state.compressedContext.length > 0) {
-          console.log(`\n🗜️ [COMPRESSION ACTIVE] Isolated ${state.compressedContext.length} high-risk sentence fragments.`);
-          
-          for (const doc of state.compressedContext) {
-            const matches = await vectorStore.similaritySearchWithScore(doc.pageContent, 1);
-            if (matches.length > 0) {
-              const [matchDoc, distance] = matches[0];
-              if (distance < 0.70) {
-                finalRiskScore += 45; // Escalate risk score based on optimized fragments
-              }
+      // 2. Evaluate compressed content against Vector Database
+      if (state.compressedContext.length > 0) {
+        console.log(`\n🗜️ [COMPRESSION ACTIVE] Isolated ${state.compressedContext.length} high-risk sentence fragments.`);
+        
+        for (const doc of state.compressedContext) {
+          const matches = await vectorStore.similaritySearchWithScore(doc.pageContent, 1);
+          if (matches.length > 0) {
+            const [matchDoc, distance] = matches[0];
+            if (distance < 0.60) {
+              finalRiskScore += 45; // Escalate risk score based on optimized fragments
             }
           }
         }
-
-        console.log(`🛡️ [FIREWALL AUDIT] Final Evaluated Risk Score: ${finalRiskScore}`);
-
-        if (finalRiskScore >= 40) {
-          throw new Error(`SECURITY_ALERT: PHI patterns detected. Transaction aborted via Fail-Closed protocol.`);
-        }
-
-        return promptToAnalyze;
       }
+
+      console.log(`🛡️ [FIREWALL AUDIT] Final Evaluated Risk Score: ${finalRiskScore}`);
+
+      if (finalRiskScore >= 40) {
+        throw new Error(`SECURITY_ALERT: PHI patterns detected. Transaction aborted via Fail-Closed protocol.`);
+      }
+
+      return promptToAnalyze;
     },
     model,
     new StringOutputParser()
